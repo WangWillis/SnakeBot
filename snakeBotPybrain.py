@@ -60,8 +60,8 @@ class NeuralNetwork():
 
 screenX = 20
 screenY = 60
-screenSize = screenX*screenY
-numHiddenLayers = 25
+inputSize = 2
+numHiddenLayers = 500
 numOutputs = 5
 numChrome = 8
 gen = 0
@@ -75,12 +75,13 @@ bestNN = 0
 bestScore = -1
 
 def createScreen(snake, food):
-    screen = [0]*screenSize
+    screen = [0]*inputSize
 
     for i in range(0, len(snake)):
-        screen[snake[i][0]*screenY+snake[i][1]] = 1
-    screen[snake[0][0]*screenY+snake[0][1]] = 8
-    screen[food[0]*screenY+food[1]] = 10
+        screen[snake[i][0]*screenY+snake[i][1]] = 5*(snake[i][0]+snake[i][1])
+    screen[snake[0][0]*screenY+snake[0][1]] = 20*(snake[0][0]+snake[0][1])
+    screen[food[0]*screenY+food[1]] = 50*(snake[0][0]+snake[0][1])
+ 
     
     return screen
 
@@ -123,10 +124,12 @@ def runGame(nn):
         win.addstr(0, 27, ' SNAKE ')                                   # 'SNAKE' strings
         win.timeout(5)
         timeAlive += 0.01
-        avgDist += math.sqrt(math.pow(snake[0][0]-food[0], 2)+math.pow(snake[0][1]-food[1], 2))
+        xDis = snake[0][0]-food[0]
+        yDis = snake[0][1]-food[1]
+        avgDist += math.sqrt(xDis*xDis+yDis*yDis)
         prevKey = key
         KEYS[4] = prevKey
-        event = KEYS[getBiggestIndex(nn.think(createScreen(snake, food)))]
+        event = KEYS[getBiggestIndex(nn.think([xDis, yDis]))]
         done = win.getch()
         key = done if done == 27 else event 
 
@@ -166,6 +169,7 @@ def runGame(nn):
             break
         
     results.append(score)
+    results.append(timeAlive)
     results.append((timeAlive*100)/avgDist)
     curses.endwin()
     return results
@@ -193,7 +197,7 @@ def breed(nn1, nn2, fit1, fit2):
 def mutate(nn, fit):
     random.seed()
     nnNew = copy.deepcopy(nn)
-    prob = sigmoid(fit)
+    prob = 0.4
 
     size = nnNew.wi.shape
     for i in range(0, size[0]):
@@ -205,7 +209,7 @@ def mutate(nn, fit):
     for i in range(0, size[0]):
         for j in range(0, size[1]):
             if random.random() < prob:
-                nnNew.wi[i][j] = random.uniform((-2)*nnNew.wi[i][j], nnNew.wi[i][j]*2)
+                nnNew.wo[i][j] = random.uniform((-2)*nnNew.wo[i][j], nnNew.wo[i][j]*2)
 
     return nnNew
 
@@ -225,11 +229,11 @@ def getMostFit(fitnesses):
     return mostFit
 
 def fitness(res):
-    return res[0]*res[0]+res[1]
+    return res[0]*res[0]+res[1]+2*res[2]
 
 #init starting off neural networks
 for i in range(len(population)):
-    population[i] = NeuralNetwork(screenSize, numHiddenLayers, numOutputs)
+    population[i] = NeuralNetwork(inputSize, numHiddenLayers, numOutputs)
 
 random.seed()
 
@@ -270,7 +274,7 @@ while key != 27:
     #make next generation
     for i in range(1, len(population)):
         #determine mutate or breed 
-        if random.random() < 0.2:
+        if random.random() < 0.4:
             population[i] = breed(mostFit[0], mostFit[1], bestFit, secFit)
         else:
             #determine if mutate most fit or second most
@@ -278,6 +282,7 @@ while key != 27:
                 population[i] = mutate(mostFit[0], bestFit)
             else:
                 population[i] = mutate(mostFit[1], secFit)
+runGame(bestNN)
 print "BestNN"
 print bestNN.wi
 print bestNN.wo
