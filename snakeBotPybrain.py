@@ -60,7 +60,7 @@ class NeuralNetwork():
 
 screenX = 20
 screenY = 60
-inputSize = 3
+inputSize = 4
 numHiddenLayers = 500
 numOutputs = 5
 numChrome = 8
@@ -114,8 +114,11 @@ def runGame(nn):
     timeLastScore = 0 
     avgDist = 0
     results = []
-
+    grid = [[0 for x in range(screenY)] for y in range(screenX)]
     snake = [[4,10], [4,9], [4,8]]                                     # Initial snake co-ordinates
+    grid[4][10] = 1
+    grid[4][9] = 1
+    grid[4][8] = 1
     food = []                                                     # First food co-ordinates
 
     while food == []:
@@ -130,13 +133,32 @@ def runGame(nn):
         win.addstr(0, 30, 'Sec: ' + str(timeAlive) + ' ')
         win.addstr(0, 27, ' SNAKE ')                                   # 'SNAKE' strings
         win.timeout(5)
+        cullX = snake[0][0]
+        cullY = snake[0][1]
+        colPosX = 0
+        colPosY = 0
+        if key == KEY_LEFT:
+            colPosY = -1
+        elif key == KEY_RIGHT:
+            colPosY = 1
+        elif key == KEY_UP:
+            colPosX = -1
+        else:
+            colPosX = 1
+
+        while cullX > 0 and cullX < screenX or cullY > 0 and cullY < screenY:
+            if grid[cullX][cullY] == 1:
+                break
+            cullX += colPosX
+            cullY += colPosY
+
         timeAlive += 0.01
         xDis = snake[0][0]-food[0]
         yDis = snake[0][1]-food[1]
         avgDist += math.sqrt(xDis*xDis+yDis*yDis)
         prevKey = key
         KEYS[4] = prevKey
-        event = KEYS[getBiggestIndex(nn.think([math.pow(xDis,5), math.pow(yDis,5), getSnakeVal(snake)]))]
+        event = KEYS[getBiggestIndex(nn.think([math.pow(xDis,3), math.pow(yDis,3), cullX, cullY]))]
         done = win.getch()
         key = done if done == 27 else event 
 
@@ -171,7 +193,9 @@ def runGame(nn):
         else:    
             last = snake.pop()                                          # [1] If it does not eat the food, length decreases
             win.addch(last[0], last[1], ' ')
+            grid[last[0]][last[1]] = 0
         win.addch(snake[0][0], snake[0][1], '#')
+        grid[snake[0][0]][snake[0][1]] = 1
         if (timeAlive-timeLastScore) > 3:
             break
         
