@@ -61,7 +61,7 @@ class NeuralNetwork():
 screenX = 20
 screenY = 60
 inputSize = 4
-numHiddenLayers = 500
+numHiddenLayers = 250
 numOutputs = 5
 numChrome = 8
 gen = 0
@@ -201,15 +201,12 @@ def runGame(nn):
         
     results.append(score)
     results.append(timeAlive)
-    results.append((timeAlive*100)/avgDist)
+    results.append(avgDist/(timeAlive*100))
     curses.endwin()
     return results
 
 def breed(nn1, nn2, fit1, fit2):
-    random.seed()
-    prob = random.random()
-    if fit1 > 0 and fit2 > 0:
-        prob = fit2/(fit1*2)
+    prob = 0.4
     nnNew = copy.deepcopy(nn1)
 
     size = nnNew.wi.shape 
@@ -228,19 +225,19 @@ def breed(nn1, nn2, fit1, fit2):
 def mutate(nn, fit):
     random.seed()
     nnNew = copy.deepcopy(nn)
-    prob = 1/sigmoid(fit)
+    prob = 0.3
 
     size = nnNew.wi.shape
     for i in range(0, size[0]):
         for j in range(0, size[1]):
             if random.random() < prob:
-                nnNew.wi[i][j] = 100*(random.random()-0.5)+random.random()
+                nnNew.wi[i][j] = (100*(random.random()-0.5)+random.random())*random.random()
 
     size = nnNew.wo.shape
     for i in range(0, size[0]):
         for j in range(0, size[1]):
             if random.random() < prob:
-                nnNew.wo[i][j] = 100*(random.random()-0.5)+random.random()
+                nnNew.wo[i][j] = (100*(random.random()-0.5)+random.random())*random.random()
     return nnNew
 
 def getMostFit(fitnesses):
@@ -259,7 +256,7 @@ def getMostFit(fitnesses):
     return mostFit
 
 def fitness(res):
-    return res[0]*res[0]+res[1]+10*res[2]
+    return 6*res[0]*res[0]+20*res[1]-res[2]
 
 #init starting off neural networks
 for i in range(len(population)):
@@ -311,7 +308,7 @@ while key != 27:
             if random.random() < 0.9:
                 population[i] = mutate(mostFit[0], bestFit)
             else:
-                population[i] = mutate(mostFit[1], secFit)
+                population[i] = mutate(breed(mostFit[0], mostFit[1], bestFit, secFit), (bestFit+secFit)/2)
 runGame(bestNN)
 print "BestNN"
 print bestNN.wi
