@@ -163,7 +163,7 @@ def runGame(nn):
         avgDist += math.sqrt(xDis*xDis+yDis*yDis)
         prevKey = key
         KEYS[4] = prevKey
-        event = KEYS[getBiggestIndex(nn.think([math.pow(xDis,1), math.pow(yDis,1), cullX, cullY]))]
+        event = KEYS[getBiggestIndex(nn.think([(99*xDis)/(xDis*xDis+1), (99*yDis)/(yDis*yDis+1), cullX, cullY]))]
         done = win.getch()
         key = done if done == 27 else event 
 
@@ -305,14 +305,12 @@ while key != 27:
     #make next generation
     for i in range(1, len(population)):
         #determine mutate or breed 
-        if random.random() < 0.4:
-            population[i] = breed(mostFit[0], mostFit[1], bestFit, secFit)
-        else:
+        if random.random() < 0.95:
             #determine if mutate most fit or second most
             if random.random() < 0.9:
                 population[i] = mutate(mostFit[0], bestFit)
             else:
-                population[i] = mutate(breed(mostFit[0], mostFit[1], bestFit, secFit), (bestFit+secFit)/2)
+                population[i] = mutate(breed(mostFit[0], mostFit[1], bestFit, secFit), secFit)
 runGame(bestNN)
 print "BestNN"
 print bestNN.wi
