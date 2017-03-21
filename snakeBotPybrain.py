@@ -60,19 +60,19 @@ class NeuralNetwork():
 
 screenX = 20
 screenY = 60
-inputSize = 4
-numHiddenLayers = 30
+inputSize = 3
+numHiddenLayers = 250
 numOutputs = 4
-numChrome = 9
+numChrome = 15
 gen = 0
 key = 0
 KEYS = [KEY_RIGHT, KEY_LEFT, KEY_UP, KEY_DOWN, KEY_RIGHT]
 
 fitnesses = [0] * numChrome
 population = [0] * numChrome
-
+bestFit = 1
 bestNN = 0
-bestScore = -1
+bestScore = 0
 
 def createScreen(snake, food):
     screen = [0]*inputSize
@@ -100,7 +100,7 @@ def getBiggestIndex(arr):
     return index
 
 def fitness(res):
-    return 1/((exp(res[0]/10)*res[0]+0.5)+((math.log(res[1]+1)+0.5)))
+    return 1/((exp(res[0])/(15))+((math.log(res[1]*100+1)/100))+1)
 
 def runGame(nn):
     curses.initscr()
@@ -111,7 +111,8 @@ def runGame(nn):
     win.border(0)
     win.nodelay(1)
     global key
-    key = KEY_RIGHT                                                    # Initializing values
+    key = KEY_RIGHT   
+    keyVal = 0                                                 # Initializing values
     score = 0
     timeAlive = 0
     timeLastScore = 0 
@@ -137,18 +138,22 @@ def runGame(nn):
         win.addstr(0, 15, 'Gen: ' + str(gen) + ' ')
         win.addstr(19, 30, 'Sec: ' + str(timeAlive) + ' ')
         win.addstr(0, 27, 'fitness: ' + str(fitness([score, timeAlive, avgDist/(timeAlive*1000)])))                # 'SNAKE' strings
-        win.timeout(5)
+        #win.timeout(5)
         cullX = snake[0][0]
         cullY = snake[0][1]
         colPosX = 0
         colPosY = 0
         if key == KEY_LEFT:
+            keyVal = 0
             colPosY = -1
         elif key == KEY_RIGHT:
+            keyVal = 1
             colPosY = 1
         elif key == KEY_UP:
+            keyVal = 2
             colPosX = -1
         else:
+            keyVal = 3
             colPosX = 1
 
         while cullX > 0 and cullX < screenX or cullY > 0 and cullY < screenY:
@@ -157,13 +162,16 @@ def runGame(nn):
             cullX += colPosX
             cullY += colPosY
 
+        cullX = abs(cullX-snake[0][0])
+        if cullX == 0:
+        	cullX = abs(cullY-snake[0][1])
         
         xDis = snake[0][0]-food[0]
         yDis = snake[0][1]-food[1]
         avgDist += math.sqrt(xDis*xDis+yDis*yDis)
         prevKey = key
         KEYS[4] = prevKey
-        event = KEYS[getBiggestIndex(nn.think([(99*xDis)/(xDis*xDis+1), (99*yDis)/(yDis*yDis+1), cullX, cullY]))]
+        event = KEYS[getBiggestIndex(nn.think([(2*xDis), (2*yDis), cullX]))]
         done = win.getch()
         key = done if done == 27 else event 
 
@@ -210,54 +218,51 @@ def runGame(nn):
     curses.endwin()
     return results
 
-def breed(nn1, nn2, fit1, fit2):
-    prob = 0.4
-    nnNew = copy.deepcopy(nn1)
+def breed(nn, bestNN, fit):
+    prob = 0.02+fit*0.785
+    nnNew = copy.deepcopy(nn)
 
     size = nnNew.wi.shape 
     for i in range(0, size[0]):
         for j in range(0, size[1]):
             if random.random() < prob:
-                nnNew.wi[i][j] = nn2.wi[i][j]
+                nnNew.wi[i][j] = bestNN.wi[i][j]
     
     size = nnNew.wo.shape 
     for i in range(0, size[0]):
         for j in range(0, size[1]):
             if random.random() < prob:
-                nnNew.wo[i][j] = nn2.wo[i][j]
+                nnNew.wo[i][j] = bestNN.wo[i][j]
     return nnNew
 
 def mutate(nn, fit):
     random.seed()
     nnNew = copy.deepcopy(nn)
-    prob = fit*random.random()
-
+    prob = 0.015+fit*0.785
     size = nnNew.wi.shape
     for i in range(0, size[0]):
         for j in range(0, size[1]):
             if random.random() < prob:
-                nnNew.wi[i][j] += math.pow(-1,random.randint(1,2))*random.uniform(0, abs(nnNew.wi[i][j]))
+                nnNew.wi[i][j] += np.random.randn()
 
     size = nnNew.wo.shape
     for i in range(0, size[0]):
         for j in range(0, size[1]):
             if random.random() < prob:
-                nnNew.wo[i][j] += math.pow(-1,random.randint(1,2))*random.uniform(0, abs(nnNew.wo[i][j]))
+                nnNew.wo[i][j] += np.random.randn()
     return nnNew
 
 def getMostFit(fitnesses):
     random.seed()
-    mostFit = [0, 0, 0.0]
+    mostFit = [0, 0.0]
     for i in range(len(fitnesses)):
-        mostFit[2] += fitnesses[i]
+        mostFit[1] += fitnesses[i]
         if fitnesses[i] < fitnesses[mostFit[0]]:
-            mostFit[1] = mostFit[0]
             mostFit[0] = i
         if fitnesses[i] == fitnesses[mostFit[0]] and random.random() < 0.5:
-            mostFit[1] = mostFit[0]
             mostFit[0] = i
 
-    mostFit[2] /= len(fitnesses)
+    mostFit[1] /= len(fitnesses)
     return mostFit
 
 
@@ -267,7 +272,7 @@ for i in range(len(population)):
     population[i] = NeuralNetwork(inputSize, numHiddenLayers, numOutputs)
 
 random.seed()
-
+welp = 0
 #loop for 1000 generations
 while key != 27:
     gen += 1
@@ -284,33 +289,48 @@ while key != 27:
         print "Score: " + str(res[0]) + " Avg Food Dist: " + str(res[1])
         print "Fitness: " + str(fitnesses[i])
 
-        if res[0] > bestScore:
+        if fitnesses[i] < bestFit:
             bestNN = population[i]
+            bestFit = fitnesses[i]
             bestScore = res[0]
+            welp = 0
     
     if key == 27:
         break
 
     #go to next generation
     mostFit = getMostFit(fitnesses) 
-    print "Gen: " + str(gen) + " Avg Fitness: " + str(mostFit[2])
+    print "Gen: " + str(gen) + " Avg Fitness: " + str(mostFit[1])
     print "Creating next gen"
     
-    bestFit = fitnesses[mostFit[0]]
-    secFit = fitnesses[mostFit[1]]
+    fitInd = mostFit[0]
+    mostFitNum = fitnesses[fitInd]
+    mostFit[0] = population[fitInd]
 
-    mostFit[0] = population[mostFit[0]]
-    mostFit[1] = population[mostFit[1]]
-    population[0] = mostFit[0] 
+    #for if it diverged too badly
+    if welp == 40:
+    	mostFit[0] = bestNN
+    	mostFitNum = bestFit
+    welp += 1
+
+    #swap the best nn to front
+    fitnesses[fitInd] = fitnesses[0]
+    fitnesses[0] = mostFitNum
+    population[fitInd] = population[0]
+    population[0] = mostFit[0]
+
     #make next generation
     for i in range(1, len(population)):
-        #determine mutate or breed 
-        if random.random() < 0.95:
-            #determine if mutate most fit or second most
-            if random.random() < 0.9:
-                population[i] = mutate(mostFit[0], bestFit)
+    	#use average fitness to determine if should change
+    	if random.random() < (0.1+0.9*mostFit[1]):
+    		#determine breeding or mutating
+            if random.random() < 0.6:
+            	population[i] = breed(population[i], population[0], fitnesses[i])
+            elif random.random() < 0.2:
+            	population[i] = mutate(population[i], fitnesses[i])
             else:
-                population[i] = mutate(breed(mostFit[0], mostFit[1], bestFit, secFit), secFit)
+            	population[i] = mutate(population[0], fitnesses[0])
+        
 runGame(bestNN)
 print "BestNN"
 print bestNN.wi
