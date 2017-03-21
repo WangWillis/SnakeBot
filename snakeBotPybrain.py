@@ -62,8 +62,8 @@ screenX = 20
 screenY = 60
 inputSize = 4
 numHiddenLayers = 30
-numOutputs = 5
-numChrome = 6
+numOutputs = 4
+numChrome = 9
 gen = 0
 key = 0
 KEYS = [KEY_RIGHT, KEY_LEFT, KEY_UP, KEY_DOWN, KEY_RIGHT]
@@ -100,7 +100,7 @@ def getBiggestIndex(arr):
     return index
 
 def fitness(res):
-    return 1/math.log(res[1]+3) - 1/(1+exp(-(res[0]-3)))
+    return 1/((exp(res[0]/10)*res[0]+0.5)+((math.log(res[1]+1)+0.5)))
 
 def runGame(nn):
     curses.initscr()
@@ -201,7 +201,7 @@ def runGame(nn):
             grid[last[0]][last[1]] = 0
         win.addch(snake[0][0], snake[0][1], '#')
         grid[snake[0][0]][snake[0][1]] = 1
-        if (timeAlive-timeLastScore) > 3:
+        if (timeAlive-timeLastScore) > 5:
             break
         
     results.append(score)
