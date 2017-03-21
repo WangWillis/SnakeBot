@@ -61,7 +61,7 @@ class NeuralNetwork():
 screenX = 20
 screenY = 60
 inputSize = 4
-numHiddenLayers = 50
+numHiddenLayers = 30
 numOutputs = 5
 numChrome = 6
 gen = 0
@@ -100,7 +100,7 @@ def getBiggestIndex(arr):
     return index
 
 def fitness(res):
-    return 1/math.log(res[1]+3)
+    return 1/math.log(res[1]+3) - 1/(1+exp(-(res[0]-3)))
 
 def runGame(nn):
     curses.initscr()
@@ -236,13 +236,13 @@ def mutate(nn, fit):
     for i in range(0, size[0]):
         for j in range(0, size[1]):
             if random.random() < prob:
-                nnNew.wi[i][j] = ((100*(random.random()-0.5)+random.random())*random.random()+math.pow(-1, random.randint(1,2))*nnNew.wi[i][j]*fit)*random.random()
+                nnNew.wi[i][j] += math.pow(-1,random.randint(1,2))*random.uniform(0, abs(nnNew.wi[i][j]))
 
     size = nnNew.wo.shape
     for i in range(0, size[0]):
         for j in range(0, size[1]):
             if random.random() < prob:
-                nnNew.wo[i][j] = ((100*(random.random()-0.5)+random.random())*random.random()+math.pow(-1, random.randint(1,2))*nnNew.wo[i][j]*fit)*random.random()
+                nnNew.wo[i][j] += math.pow(-1,random.randint(1,2))*random.uniform(0, abs(nnNew.wo[i][j]))
     return nnNew
 
 def getMostFit(fitnesses):
