@@ -61,9 +61,9 @@ class NeuralNetwork():
 screenX = 20
 screenY = 60
 inputSize = 4
-numHiddenLayers = 250
+numHiddenLayers = 50
 numOutputs = 5
-numChrome = 8
+numChrome = 6
 gen = 0
 key = 0
 KEYS = [KEY_RIGHT, KEY_LEFT, KEY_UP, KEY_DOWN, KEY_RIGHT]
@@ -99,6 +99,9 @@ def getBiggestIndex(arr):
             index = i
     return index
 
+def fitness(res):
+    return 1/math.log(res[1]+3)
+
 def runGame(nn):
     curses.initscr()
     curses.noecho()
@@ -114,6 +117,7 @@ def runGame(nn):
     timeLastScore = 0 
     avgDist = 0
     results = []
+    
     grid = [[0 for x in range(screenY)] for y in range(screenX)]
     snake = [[4,10], [4,9], [4,8]]                                     # Initial snake co-ordinates
     grid[4][10] = 1
@@ -126,12 +130,13 @@ def runGame(nn):
         if food in snake: food = []
     win.addch(food[0], food[1], '*')
 
-    while key != 27:                                                   # While Esc key is not pressed
+    while key != 27:       
+        timeAlive += 0.01                                            # While Esc key is not pressed
         win.border(0)
         win.addstr(0, 2, 'Score: ' + str(score) + ' ')                # Printing 'Score' and
         win.addstr(0, 15, 'Gen: ' + str(gen) + ' ')
-        win.addstr(0, 30, 'Sec: ' + str(timeAlive) + ' ')
-        win.addstr(0, 27, ' SNAKE ')                                   # 'SNAKE' strings
+        win.addstr(19, 30, 'Sec: ' + str(timeAlive) + ' ')
+        win.addstr(0, 27, 'fitness: ' + str(fitness([score, timeAlive, avgDist/(timeAlive*1000)])))                # 'SNAKE' strings
         win.timeout(5)
         cullX = snake[0][0]
         cullY = snake[0][1]
@@ -152,13 +157,13 @@ def runGame(nn):
             cullX += colPosX
             cullY += colPosY
 
-        timeAlive += 0.01
+        
         xDis = snake[0][0]-food[0]
         yDis = snake[0][1]-food[1]
         avgDist += math.sqrt(xDis*xDis+yDis*yDis)
         prevKey = key
         KEYS[4] = prevKey
-        event = KEYS[getBiggestIndex(nn.think([math.pow(xDis,3), math.pow(yDis,3), cullX, cullY]))]
+        event = KEYS[getBiggestIndex(nn.think([math.pow(xDis,1), math.pow(yDis,1), cullX, cullY]))]
         done = win.getch()
         key = done if done == 27 else event 
 
@@ -225,19 +230,19 @@ def breed(nn1, nn2, fit1, fit2):
 def mutate(nn, fit):
     random.seed()
     nnNew = copy.deepcopy(nn)
-    prob = 0.3
+    prob = fit*random.random()
 
     size = nnNew.wi.shape
     for i in range(0, size[0]):
         for j in range(0, size[1]):
             if random.random() < prob:
-                nnNew.wi[i][j] = (100*(random.random()-0.5)+random.random())*random.random()
+                nnNew.wi[i][j] = ((100*(random.random()-0.5)+random.random())*random.random()+math.pow(-1, random.randint(1,2))*nnNew.wi[i][j]*fit)*random.random()
 
     size = nnNew.wo.shape
     for i in range(0, size[0]):
         for j in range(0, size[1]):
             if random.random() < prob:
-                nnNew.wo[i][j] = (100*(random.random()-0.5)+random.random())*random.random()
+                nnNew.wo[i][j] = ((100*(random.random()-0.5)+random.random())*random.random()+math.pow(-1, random.randint(1,2))*nnNew.wo[i][j]*fit)*random.random()
     return nnNew
 
 def getMostFit(fitnesses):
@@ -245,7 +250,7 @@ def getMostFit(fitnesses):
     mostFit = [0, 0, 0.0]
     for i in range(len(fitnesses)):
         mostFit[2] += fitnesses[i]
-        if fitnesses[i] > fitnesses[mostFit[0]]:
+        if fitnesses[i] < fitnesses[mostFit[0]]:
             mostFit[1] = mostFit[0]
             mostFit[0] = i
         if fitnesses[i] == fitnesses[mostFit[0]] and random.random() < 0.5:
@@ -255,8 +260,7 @@ def getMostFit(fitnesses):
     mostFit[2] /= len(fitnesses)
     return mostFit
 
-def fitness(res):
-    return 6*res[0]*res[0]+20*res[1]-res[2]
+
 
 #init starting off neural networks
 for i in range(len(population)):
