@@ -13,6 +13,8 @@ import logging
 from curses import KEY_RIGHT, KEY_LEFT, KEY_UP, KEY_DOWN
 from random import randint
 
+np.set_printoptions(threshold=np.nan)
+
 logging.basicConfig(filename="SnakeRLLog.log", level=logging.DEBUG)
 
 screenX = 20
@@ -59,9 +61,10 @@ def policy_network():
         connL2 = tf.nn.tanh(connL2)
         poli_out = tf.matmul(connL2, outLayer)
         poli_out = tf.nn.softmax(poli_out)
-
-        prob = tf.multiply(tf.log(poli_out), action)
-        loss = -(tf.reduce_sum(prob*advantages))
+        good_probabilities = tf.reduce_sum(tf.multiply(poli_out, action),reduction_indices=[1])
+        # maximize the log probability
+        log_probabilities = tf.log(good_probabilities)
+        loss = -tf.reduce_sum(log_probabilities)
         optimizer = tf.train.AdamOptimizer(0.1).minimize(loss)
 
         return poli_out, gridIn, action, advantages, optimizer
@@ -99,15 +102,65 @@ def value_network():
 slow = False
 noEps = False
 key = 0
+nextKey = 0
 doneKey = 0
 foodScore = 1000
-badScore = -1000
+badScore = -100
+
+class SnakeGame:
+    def __init__():
+        
+
+    def resetAndStart():
+        curses.initscr()
+        curses.noecho()
+        curses.curs_set(0)
+        self.win = curses.newwin(screenX, screenY, 0, 0)
+        self.win.keypad(1)
+        self.win.border(0)
+        self.win.nodelay(1)
+        doneKey = 0
+        key = KEY_RIGHT
+        score = 0
+        timeAlive = 0
+        timeLastScore = 0
+
+        #store the states and return for the learning
+        states = []
+        actions = []
+        transitions = []
+
+        results = []
+
+        grid = np.zeros((screenX, screenY))
+        grid.fill(badScore)
+        grid[1:-1,1:-1] = 0
+        snake = [[4,10], [4,9], [4,8]]                                     # Initial snake co-ordinates
+        grid[4][10] = badScore
+        grid[4][9] = badScore
+        grid[4][8] = badScore
+        food = []
+
+        while food == []:
+            foodX = randint(1, screenX-2)
+            foodY = randint(1, screenY-2)
+            if(grid[foodX][foodY] != 0):
+                continue
+            food = [foodX, foodY]
+            grid[foodX][foodY] = foodScore
+
+        win.addch(food[0], food[1], '*')
+
+    def oneStep(move):
+
+
 def runGame(poliOut, gridInput):
     global slow
     global noEps
     global key
     global doneKey
     global foodScore
+    global nextKey
     curses.initscr()
     curses.noecho()
     curses.curs_set(0)
@@ -158,19 +211,22 @@ def runGame(poliOut, gridInput):
 
         # controls stuff
         action = [0, 0, 0, 0] #one hot vector representing which key pressed
-        nextKey = 0
         if(not noEps and np.random.uniform(0,1) < eps):
             nextKey = randint(0, 3)
         else:
             gridIn = np.reshape(grid, [-1, screenX, screenY, 1])
             qValArr = sess.run(poliOut, feed_dict={gridInput: gridIn})[0]
+            logging.debug(qValArr)
             currMin = 0
+            num = 0
             randNum = np.random.uniform(0,1)
             for i in range(len(qValArr)):
                 if(randNum >= currMin and randNum < qValArr[i]):
-                    nextKey = i
+                    nextKey = num
                     break
+                num += 1
                 currMin += qValArr[i]
+            logging.debug(nextKey)
         action[nextKey] = 1
         event = KEYS[nextKey]
 
@@ -287,3 +343,4 @@ while doneKey != 27:
     if(gameNum < exploreTime):
         eps = 1-((1-minExplore)/exploreTime)*gameNum
     gameNum += 1
+sess.close()
