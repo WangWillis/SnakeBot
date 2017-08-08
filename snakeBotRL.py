@@ -23,8 +23,8 @@ screenY = 60
 KEYS = [KEY_RIGHT, KEY_LEFT, KEY_UP, KEY_DOWN, KEY_RIGHT]
 eps = 1.0
 
-convF1Size = 5
-convF2Size = 10
+convF1Size = 20
+convF2Size = 60
 inConnW1Size = int((screenX/4)*(screenY/4)*convF2Size)
 connW1Size = 5
 connW2Size = 20
@@ -36,8 +36,8 @@ def policy_network():
         advantages = tf.placeholder("float32", [None, 1])
 
         # set up conv nn
-        convF1 = tf.get_variable("convF1", [3, 3, 1, convF1Size])
-        convF2 = tf.get_variable("convF2", [3, 3, convF1Size, convF2Size])
+        convF1 = tf.get_variable("convF1", [5, 5, 1, convF1Size])
+        convF2 = tf.get_variable("convF2", [5, 5, convF1Size, convF2Size])
         connW1 = tf.get_variable("connW1", [inConnW1Size, connW1Size])
         connW2 = tf.get_variable("connW2", [connW1Size, connW2Size])
         outLayer = tf.get_variable("outLayer", [connW2Size, numOutputs])
@@ -56,18 +56,23 @@ def policy_network():
         #fully connected layer
         connIn = tf.reshape(convL2, [-1, inConnW1Size])
         connL1 = tf.matmul(connIn, connW1)
-        connL1 = tf.nn.tanh(connL1)
+        connL1 = tf.nn.relu(connL1)
         connL2 = tf.matmul(connL1, connW2)
-        connL2 = tf.nn.tanh(connL2)
-        poli_out = tf.matmul(connL2, outLayer)
-        poli_out = tf.nn.softmax(poli_out)
-        good_probabilities = tf.reduce_sum(tf.multiply(poli_out, action),reduction_indices=[1])
-        # maximize the log probability
-        log_probabilities = tf.log(good_probabilities)
-        loss = -tf.reduce_sum(log_probabilities)
-        optimizer = tf.train.AdamOptimizer(0.1).minimize(loss)
+        connL2 = tf.nn.relu(connL2)
+        preOut = tf.matmul(connL2, outLayer)
+        poli_out = tf.nn.softmax(preOut)
 
-        return poli_out, gridIn, action, advantages, optimizer
+        advantage_ten = advantages-tf.reduce_mean(advantages, axis=0, keep_dims=True)
+        advantage_ten = advantages-tf.reduce_mean(advantages, axis=0, keep_dims=True)
+        advantage_ten = advantage_ten*action
+
+        updateOut = preOut + advantage_ten
+
+        cost = tf.square(updateOut-preOut)
+        cost = tf.reduce_mean(cost)
+        optimizer = tf.train.AdamOptimizer(0.1).minimize(cost)
+
+        return poli_out, gridIn, action, advantages, optimizer, updateOut, cost, advantage_ten
 
 inL1Size = 5
 hL1Size = 20
@@ -102,56 +107,56 @@ def value_network():
 slow = False
 noEps = False
 key = 0
-nextKey = 0
+# nextKey = 0
 doneKey = 0
-foodScore = 1000
+foodScore = 1
 badScore = -100
-
-class SnakeGame:
-    def __init__():
-        
-
-    def resetAndStart():
-        curses.initscr()
-        curses.noecho()
-        curses.curs_set(0)
-        self.win = curses.newwin(screenX, screenY, 0, 0)
-        self.win.keypad(1)
-        self.win.border(0)
-        self.win.nodelay(1)
-        doneKey = 0
-        key = KEY_RIGHT
-        score = 0
-        timeAlive = 0
-        timeLastScore = 0
-
-        #store the states and return for the learning
-        states = []
-        actions = []
-        transitions = []
-
-        results = []
-
-        grid = np.zeros((screenX, screenY))
-        grid.fill(badScore)
-        grid[1:-1,1:-1] = 0
-        snake = [[4,10], [4,9], [4,8]]                                     # Initial snake co-ordinates
-        grid[4][10] = badScore
-        grid[4][9] = badScore
-        grid[4][8] = badScore
-        food = []
-
-        while food == []:
-            foodX = randint(1, screenX-2)
-            foodY = randint(1, screenY-2)
-            if(grid[foodX][foodY] != 0):
-                continue
-            food = [foodX, foodY]
-            grid[foodX][foodY] = foodScore
-
-        win.addch(food[0], food[1], '*')
-
-    def oneStep(move):
+#
+# class SnakeGame:
+#     def __init__():
+#
+#
+#     def resetAndStart():
+#         curses.initscr()
+#         curses.noecho()
+#         curses.curs_set(0)
+#         self.win = curses.newwin(screenX, screenY, 0, 0)
+#         self.win.keypad(1)
+#         self.win.border(0)
+#         self.win.nodelay(1)
+#         doneKey = 0
+#         key = KEY_RIGHT
+#         score = 0
+#         timeAlive = 0
+#         timeLastScore = 0
+#
+#         #store the states and return for the learning
+#         states = []
+#         actions = []
+#         transitions = []
+#
+#         results = []
+#
+#         grid = np.zeros((screenX, screenY))
+#         grid.fill(badScore)
+#         grid[1:-1,1:-1] = 0
+#         snake = [[4,10], [4,9], [4,8]]                                     # Initial snake co-ordinates
+#         grid[4][10] = badScore
+#         grid[4][9] = badScore
+#         grid[4][8] = badScore
+#         food = []
+#
+#         while food == []:
+#             foodX = randint(1, screenX-2)
+#             foodY = randint(1, screenY-2)
+#             if(grid[foodX][foodY] != 0):
+#                 continue
+#             food = [foodX, foodY]
+#             grid[foodX][foodY] = foodScore
+#
+#         win.addch(food[0], food[1], '*')
+#
+#     def oneStep(move):
 
 
 def runGame(poliOut, gridInput):
@@ -160,7 +165,7 @@ def runGame(poliOut, gridInput):
     global key
     global doneKey
     global foodScore
-    global nextKey
+    # global nextKey
     curses.initscr()
     curses.noecho()
     curses.curs_set(0)
@@ -185,12 +190,14 @@ def runGame(poliOut, gridInput):
     results = []
 
     grid = np.zeros((screenX, screenY))
-    grid.fill(badScore)
-    grid[1:-1,1:-1] = 0
-    snake = [[4,10], [4,9], [4,8]]                                     # Initial snake co-ordinates
-    grid[4][10] = badScore
-    grid[4][9] = badScore
-    grid[4][8] = badScore
+    # grid.fill(badScore)
+    # grid[1:-1,1:-1] = 0
+    snakeX = randint(5, screenX-5)
+    snakeY = randint(5, screenY-5)
+    snake = [[snakeX,snakeY], [snakeX, snakeY-1], [snakeX,snakeY-2]]                                     # Initial snake co-ordinates
+    grid[snakeX][snakeY] = badScore
+    grid[snakeX][snakeY-1] = badScore
+    grid[snakeX][snakeY-2] = badScore
 
     food = []
 
@@ -211,24 +218,26 @@ def runGame(poliOut, gridInput):
 
         # controls stuff
         action = [0, 0, 0, 0] #one hot vector representing which key pressed
+        key = KEYS[3]
         if(not noEps and np.random.uniform(0,1) < eps):
             nextKey = randint(0, 3)
+            action[nextKey] = 1
+            key = KEYS[nextKey]
         else:
             gridIn = np.reshape(grid, [-1, screenX, screenY, 1])
             qValArr = sess.run(poliOut, feed_dict={gridInput: gridIn})[0]
-            logging.debug(qValArr)
+            # logging.debug(qValArr)
             currMin = 0
-            num = 0
             randNum = np.random.uniform(0,1)
+            logging.debug(randNum)
+            logging.debug(qValArr)
             for i in range(len(qValArr)):
-                if(randNum >= currMin and randNum < qValArr[i]):
-                    nextKey = num
+                if(randNum >= currMin and randNum < qValArr[i]+currMin):
+                    logging.debug(i)
+                    key = KEYS[i]
+                    action[i] = 1
                     break
-                num += 1
                 currMin += qValArr[i]
-            logging.debug(nextKey)
-        action[nextKey] = 1
-        event = KEYS[nextKey]
 
         doneKey = win.getch()
 
@@ -237,7 +246,6 @@ def runGame(poliOut, gridInput):
         if(doneKey == ord("n")):
             noEps = not noEps
 
-        key = event
 
         transition = [grid, action, 0]
 
@@ -246,7 +254,7 @@ def runGame(poliOut, gridInput):
         if snake[0] == food:                                            # When snake eats the food
             food = []
             score += 1
-            transition[2] = foodScore
+            transition[2] += foodScore
             timeLastScore = timeAlive
 
             while food == []:
@@ -262,6 +270,7 @@ def runGame(poliOut, gridInput):
             last = snake.pop()                                          # [1] If it does not eat the food, length decreases
             win.addch(last[0], last[1], ' ')
             grid[last[0]][last[1]] = 0
+        transition[2] += 0.01
         win.addch(snake[0][0], snake[0][1], '#')
         grid[snake[0][0]][snake[0][1]] = badScore
 
@@ -287,7 +296,7 @@ def runGame(poliOut, gridInput):
 
     return transitions, states, actions, score
 
-policy_prob, grid_in, act, advantage, opt = policy_network()
+policy_prob, grid_in, act, advantage, opt, updateOut, cost, advantage_ten = policy_network()
 val_value, val_grid, val_correct, val_opt, val_loss = value_network()
 
 sess = tf.InteractiveSession()
@@ -330,11 +339,10 @@ while doneKey != 27:
     states = np.reshape(states_reshape, [len(states), screenX, screenY, 1])
     advantages_vector = np.reshape(advantages, [len(advantages), 1])
     actions = np.reshape(actions, [len(actions), 4])
-    sess.run(opt, feed_dict={grid_in: states, advantage: advantages_vector, act: actions})
+    probs = sess.run(policy_prob, feed_dict={grid_in:states})
+    _, costVal = sess.run([opt, cost], feed_dict={grid_in: states, advantage: advantages_vector, act: actions})
 
-    infoStr = "Game: " + str(gameNum) + " Score: " + str(score) + " MaxScore: " + str(maxScore) + " Loss: " + str(loss) + " Eps: " + str(eps) + " Slow: " + str(slow) + " No Eps: " + str(noEps)
-
-    print(infoStr)
+    infoStr = "Game: " + str(gameNum) + " Score: " + str(score) + " MaxScore: " + str(maxScore) + " Val Cost: " + str(loss) + " Poly Cost: " + str(costVal) + " Eps: " + str(eps) + " No Eps: " + str(noEps)
     logging.info(infoStr)
 
     if(score > maxScore):
