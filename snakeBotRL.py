@@ -20,8 +20,8 @@ logging.basicConfig(filename="SnakeRLLog.log", level=logging.DEBUG)
 screenX = 20
 screenY = 60
 
-KEYS = [KEY_RIGHT, KEY_LEFT, KEY_UP, KEY_DOWN, KEY_RIGHT]
-eps = 1.0
+KEYS = [KEY_RIGHT, KEY_LEFT, KEY_UP, KEY_DOWN]
+eps = 0.1
 
 convF1Size = 20
 convF2Size = 60
@@ -62,9 +62,9 @@ def policy_network():
         preOut = tf.matmul(connL2, outLayer)
         poli_out = tf.nn.softmax(preOut)
 
-        advantage_ten = advantages-tf.reduce_mean(advantages, axis=0, keep_dims=True)
-        advantage_ten = advantages-tf.reduce_mean(advantages, axis=0, keep_dims=True)
-        advantage_ten = advantage_ten*action
+        # advantage_ten = advantages-tf.reduce_mean(advantages, axis=0, keep_dims=True)
+        # advantage_ten = advantages-tf.reduce_mean(advantages, axis=0, keep_dims=True)
+        advantage_ten = advantages*action
 
         updateOut = preOut + advantage_ten
 
@@ -92,14 +92,15 @@ def value_network():
         w3 = tf.get_variable("w3", [hL1Size, hL2Size])
         b3 = tf.get_variable("b3", [hL2Size])
 
-        calculated = tf.nn.tanh(tf.matmul(h1,w2) + b2)
-        calculated = tf.nn.tanh(tf.matmul(calculated, w3) + b3)
+        calculated = tf.nn.relu(tf.matmul(h1,w2) + b2)
+        calculated = tf.nn.relu(tf.matmul(calculated, w3) + b3)
         outW = tf.get_variable("outW", [hL2Size, outSize])
         outB = tf.get_variable("outB", [outSize])
         val_out = tf.matmul(calculated, outW) + outB
 
-        diffs = val_out - newvals
-        loss = tf.nn.l2_loss(diffs)
+        diffs = newvals-val_out
+        loss = tf.square(diffs)
+        loss = tf.reduce_mean(loss)
         optimizer = tf.train.AdamOptimizer(0.1).minimize(loss)
         return calculated, state, newvals, optimizer, loss
 
@@ -109,8 +110,8 @@ noEps = False
 key = 0
 # nextKey = 0
 doneKey = 0
-foodScore = 1
-badScore = -100
+foodScore = 100000
+badScore = 0
 #
 # class SnakeGame:
 #     def __init__():
@@ -190,14 +191,14 @@ def runGame(poliOut, gridInput):
     results = []
 
     grid = np.zeros((screenX, screenY))
-    # grid.fill(badScore)
+    # grid.fill(-50)
     # grid[1:-1,1:-1] = 0
     snakeX = randint(5, screenX-5)
     snakeY = randint(5, screenY-5)
     snake = [[snakeX,snakeY], [snakeX, snakeY-1], [snakeX,snakeY-2]]                                     # Initial snake co-ordinates
-    grid[snakeX][snakeY] = badScore
-    grid[snakeX][snakeY-1] = badScore
-    grid[snakeX][snakeY-2] = badScore
+    grid[snakeX][snakeY] = -100
+    grid[snakeX][snakeY-1] = -50
+    grid[snakeX][snakeY-2] = -50
 
     food = []
 
@@ -207,7 +208,7 @@ def runGame(poliOut, gridInput):
         if(grid[foodX][foodY] != 0):
             continue
         food = [foodX, foodY]
-        grid[foodX][foodY] = foodScore
+        grid[foodX][foodY] = 100
 
     win.addch(food[0], food[1], '*')
 
@@ -229,11 +230,9 @@ def runGame(poliOut, gridInput):
             # logging.debug(qValArr)
             currMin = 0
             randNum = np.random.uniform(0,1)
-            logging.debug(randNum)
             logging.debug(qValArr)
             for i in range(len(qValArr)):
                 if(randNum >= currMin and randNum < qValArr[i]+currMin):
-                    logging.debug(i)
                     key = KEYS[i]
                     action[i] = 1
                     break
@@ -263,34 +262,32 @@ def runGame(poliOut, gridInput):
                 if(grid[foodX][foodY] != 0):
                     continue
                 food = [foodX, foodY]
-                grid[foodX][foodY] = foodScore
+                grid[foodX][foodY] = 100
 
             win.addch(food[0], food[1], '*')
         else:
             last = snake.pop()                                          # [1] If it does not eat the food, length decreases
             win.addch(last[0], last[1], ' ')
             grid[last[0]][last[1]] = 0
-        transition[2] += 0.01
         win.addch(snake[0][0], snake[0][1], '#')
-        grid[snake[0][0]][snake[0][1]] = badScore
-
-
-
-        if(doneKey == 27):
-            break
-
-        if(snake[0][0] <= 0 or snake[0][0] >= screenX-1 or snake[0][1] <= 0 or snake[0][1] >= screenY-1 or snake[0] in snake[1:]):
-            transition[2] = badScore
-            states.append(transition[0])
-            actions.append(transition[1])
-            transitions.append(transition)
-            break
+        grid[snake[0][0]][snake[0][1]] = -100
+        grid[snake[1][0]][snake[1][1]] = -50
 
         states.append(transition[0])
         actions.append(transition[1])
         transitions.append(transition)
+
+        if(snake[0][0] <= 0 or snake[0][0] >= screenX-1 or snake[0][1] <= 0 or snake[0][1] >= screenY-1 or snake[0] in snake[1:]):
+            transition[2] = 0
+            break
+
         if (timeAlive-timeLastScore) > 5:
             break
+
+        if(doneKey == 27):
+            break
+
+        transition[2] += 1
         key = win.getch()
     curses.endwin()
 
@@ -348,7 +345,7 @@ while doneKey != 27:
     if(score > maxScore):
         maxScore = score
 
-    if(gameNum < exploreTime):
-        eps = 1-((1-minExplore)/exploreTime)*gameNum
+    # if(gameNum < exploreTime):
+    #     eps = 1-((1-minExplore)/exploreTime)*gameNum
     gameNum += 1
 sess.close()
